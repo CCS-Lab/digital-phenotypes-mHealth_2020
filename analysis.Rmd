@@ -1,0 +1,710 @@
+---
+output:
+  pdf_document:
+    latex_engine: lualatex
+    number_sections: yes
+header-includes:
+- \usepackage{booktabs}
+- \usepackage{longtable}
+- \usepackage{array}
+- \usepackage{multirow}
+- \usepackage{wrapfig}
+- \usepackage{float}
+- \usepackage{colortbl}
+- \usepackage{pdflscape}
+- \usepackage{tabu}
+- \usepackage{threeparttable}
+- \usepackage{threeparttablex}
+- \usepackage[normalem]{ulem}
+- \usepackage{makecell}
+- \usepackage{xcolor}
+editor_options:
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+rm(list = ls())
+
+suppressMessages(library(tidyverse))
+suppressMessages(library(ggrepel))
+suppressMessages(library(cowplot))
+suppressMessages(library(latex2exp))
+suppressMessages(library(glmnet))
+suppressMessages(library(knitr))
+suppressMessages(library(kableExtra))
+suppressMessages(library(parallel))
+suppressMessages(library(gridExtra))
+suppressMessages(library(grid))
+
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE,
+                      out.width = '0.8\\textwidth', fig.align = 'center', dpi = 300)
+
+source("./lib/functions.R")
+source('./lib/constants.R')
+```
+
+# Data
+
+```{r data}
+ALPHAS <- seq(0.01, 1, by = 0.01)
+N_ITER_PER_ALPHA <- 1000
+
+dat <- read_csv('./data/data_raw.csv')
+
+predictors <- c(
+  col_fix_pre_beh,
+  col_fix_pre_cog,
+  col_fix_pre_emo,
+  col_fix_pre_mot,
+  col_rep_beh[1:3],
+  col_rep_beh[8:15],
+  col_rep_beh[22:24],
+  col_rep_beh[26:27],
+  col_msg,
+  col_rep_cog[1],
+  col_rep_emo[1:5],
+  col_rep_mot[1:4]
+)
+
+categories <- c(
+  "Conventional Phenotypes",
+  "Digital Phenotypes"
+)
+
+categories_sub <- c(
+  "Conventional Phenotypes",
+  "Digital Phenotypes (Behavioral)",
+  "Digital Phenotypes (Cognitive)",
+  "Digital Phenotypes (Emotional)",
+  "Digital Phenotypes (Motivational)"
+)
+
+categories_sub2 <- c(
+  "Behavioral",
+  "Cognitive",
+  "Emotional",
+  "Motivational"
+)
+
+map_col_to_cat2 <- list()
+for (k in col_info)     map_col_to_cat2[[k]] <- categories[1]
+for (k in col_fix)      map_col_to_cat2[[k]] <- categories[1]
+map_col_to_cat2[["Age"]]                     <- categories[1]
+for (k in col_rep_beh)  map_col_to_cat2[[k]] <- categories[2]
+map_col_to_cat2[["NumMessages"]]             <- categories[2]
+for (k in col_rep_cog)  map_col_to_cat2[[k]] <- categories[2]
+for (k in col_rep_emo)  map_col_to_cat2[[k]] <- categories[2]
+for (k in col_rep_mot)  map_col_to_cat2[[k]] <- categories[2]
+
+map_col_to_cat <- list()
+for (k in col_info)     map_col_to_cat[[k]] <- categories_sub[1]
+for (k in col_fix)      map_col_to_cat[[k]] <- categories_sub[1]
+map_col_to_cat[["Age"]]                     <- categories_sub[1]
+for (k in col_rep_beh)  map_col_to_cat[[k]] <- categories_sub[2]
+map_col_to_cat[["NumMessages"]]             <- categories_sub[2]
+for (k in col_rep_cog)  map_col_to_cat[[k]] <- categories_sub[3]
+for (k in col_rep_emo)  map_col_to_cat[[k]] <- categories_sub[4]
+for (k in col_rep_mot)  map_col_to_cat[[k]] <- categories_sub[5]
+
+map_col_to_cat3 <- list()
+for (k in col_fix_pre_beh)  map_col_to_cat3[[k]] <- categories_sub2[1]
+for (k in col_rep_beh)  map_col_to_cat3[[k]] <- categories_sub2[1]
+for (k in col_fix_pre_cog)  map_col_to_cat3[[k]] <- categories_sub2[2]
+map_col_to_cat3[["NumMessages"]]             <- categories_sub2[1]
+for (k in col_rep_cog)  map_col_to_cat3[[k]] <- categories_sub2[2]
+for (k in col_fix_pre_emo)  map_col_to_cat3[[k]] <- categories_sub2[3]
+for (k in col_rep_emo)  map_col_to_cat3[[k]] <- categories_sub2[3]
+for (k in col_fix_pre_mot)  map_col_to_cat3[[k]] <- categories_sub2[4]
+for (k in col_rep_mot)  map_col_to_cat3[[k]] <- categories_sub2[4]
+
+map_pred <- list()
+for (p in predictors) {
+  if (p == "Pre_KBDI")
+    map_pred[[p]] <- "Depression"
+  else if (p == "Pre_ATQ30")
+    map_pred[[p]] <- "Automatic Thoughts"
+  else if (p == "Pre_BSQ8C")
+    map_pred[[p]] <- "Body Satisfaction"
+  else if (p == "Pre_TAI")
+    map_pred[[p]] <- "Anxiety"
+  else if (p == "Pre_RSES")
+    map_pred[[p]] <- "Self-esteem"
+  else if (p == "Pre_DEBQ_RE")
+    map_pred[[p]] <- "Restricted Eating"
+  else if (p == "Pre_DEBQ_EM")
+    map_pred[[p]] <- "Emotional Eating"
+  else if (p == "Pre_DEBQ_ENV")
+    map_pred[[p]] <- "Environmental Eating"
+  else if (p == "Pre_YFAS_total")
+    map_pred[[p]] <- "Food Addiction"
+  else if (p == "Pre_SIMS")
+    map_pred[[p]] <- "Conventional Motivation"
+  else if (p == "BreakKcal")
+    map_pred[[p]] <- "Breakfast"
+  else if (p == "LunchKcal")
+    map_pred[[p]] <- "Lunch"
+  else if (p == "DinnerKcal")
+    map_pred[[p]] <- "Dinner"
+  else if (p == "Snack1Kcal")
+    map_pred[[p]] <- "Morning Snack"
+  else if (p == "Snack2Kcal")
+    map_pred[[p]] <- "Afternoon Snack"
+  else if (p == "Snack3Kcal")
+    map_pred[[p]] <- "Evening Snack"
+  else if (p == "NumMessages")
+    map_pred[[p]] <- "Interaction Frequency"
+  else if (p == "CognitionNum")
+    map_pred[[p]] <- "Obesity Automatic Thoughts"
+  else if (p == "RedP")
+    map_pred[[p]] <- "High Calorie Food"
+  else if (p == "YellowP")
+    map_pred[[p]] <- "Moderate Calorie Food"
+  else if (p == "GreenP")
+    map_pred[[p]] <- "Low Calorie Food"
+  else if (p == "Na")
+    map_pred[[p]] <- "Sodium"
+  else if (p == "Rank")
+    map_pred[[p]] <- "Importance"
+  else if (p == "")
+    map_pred[[p]] <- ""
+  else   map_pred[[p]] <- p
+}
+
+map_pred_rev <- list()
+for (k in names(map_pred)) {
+  map_pred_rev[[map_pred[[k]]]] <- k;
+}
+
+dat_glm_raw <- prepare_data(dat, predictors) %>% drop_na()
+dat_glm <- scale_df(dat_glm_raw)
+```
+
+# Figure 2 
+
+```{r}
+titles = list(
+  WeightChange1 = 'Weight change',
+  WeightChange3 = 'Week 0 vs. Follow-up'
+)
+xlabels = list(
+  WeightChange1 = 'Health outcome (short-term)\n(weight loss across 8 weeks)',
+  WeightChange3 = 'Health outcome (long-term)\n(weight loss across 24 weeks)'
+)
+
+plots <- list()
+cols_weight_change <- c('WeightChange1', 'WeightChange3')
+
+for (i in 1:length(cols_weight_change)) {
+  c_x <- 'NumLogged'
+  c_y <- cols_weight_change[i]
+  
+  fit_cor <- cor.test(dat_glm_raw[[c_x]], dat_glm_raw[[c_y]])
+  
+  label_cor <- str_c(
+    sprintf("Pearson's r = %.2f\n", fit_cor$estimate[['cor']]),
+    ifelse(round(fit_cor$p.value, 3) >= 0.001,
+      sprintf("(t = %.2f, df = %d, p = %.3f)",
+              fit_cor$statistic[['t']],
+              fit_cor$parameter[['df']],
+              fit_cor$p.value),
+      sprintf("(t = %.2f, df = %d, p < 0.001)",
+              fit_cor$statistic[['t']],
+              fit_cor$parameter[['df']])
+    )
+  )
+  
+  plots[[i]] <-
+    dat_glm_raw %>%
+    ggplot(aes_string(x = c_x, y = c_y)) +
+    annotate("text", x = 37.5, y = -.275, label = label_cor, size = 3,
+             hjust = 0.5) +
+    geom_hline(yintercept = 0, alpha = 0.3) +
+    geom_smooth(method = 'glm', se = FALSE, size = 0.5, color = "red") +
+    geom_point(size = 2, shape = 21) +
+    annotate("text", x = 25, y = .275, label = label_cor, size = 3, hjust = 0) +
+    scale_x_continuous(breaks = seq(25, 55, 5), minor_breaks = seq(25, 55, 2.5)) +
+    scale_y_continuous(labels = scales::percent, breaks = seq(-.3, .3, .1)) +
+    labs(x = 'Engagement\n(number of activity logs)',
+         y = xlabels[[c_y]]) +
+    coord_cartesian(xlim = c(25, 55), ylim = c(-.1, .3)) +
+    theme_bw() +
+    theme(axis.title = element_text(size = 10, lineheight = 1.15),
+          axis.text = element_text(size = 8))
+}
+
+p_corr_eng_ho <- plot_grid(plotlist = plots, nrow = 1, align = 'hv', labels = 'AUTO')
+
+ggsave('./figures/figure_2ab.png', p_corr_eng_ho, width = 7, height = 3)
+```
+
+```{r}
+fit_cor <- cor.test(dat_glm_raw$WeightChange1, dat_glm_raw$WeightChange3)
+
+label_cor <- str_c(
+  sprintf("Pearson's r = %.2f\n", fit_cor$estimate[['cor']]),
+  ifelse(round(fit_cor$p.value, 3) >= 0.001,
+    sprintf("(t = %.2f, df = %d, p = %.3f)",
+            fit_cor$statistic[['t']],
+            fit_cor$parameter[['df']],
+            fit_cor$p.value),
+    sprintf("(t = %.2f, df = %d, p < 0.001)",
+            fit_cor$statistic[['t']],
+            fit_cor$parameter[['df']])
+  )
+)
+  
+p_corr_weight <- dat_glm_raw %>%
+  ggplot(aes(x = WeightChange1, y = WeightChange3)) +
+  geom_abline(slope = 1, intercept = 0, linetype = 'dashed', alpha = 0.3) +
+  geom_vline(xintercept = 0, alpha = 0.3) +
+  geom_hline(yintercept = 0, alpha = 0.3) +
+  geom_point(aes(fill = NumLogged), size = 2, shape = 21) +
+  annotate("text", x = .195, y = -.07, label = label_cor, size = 3, hjust = 1) +
+  scale_x_continuous(labels = scales::percent) +
+  scale_y_continuous(labels = scales::percent) +
+  scale_fill_distiller(name = "Engagement\n(number of activity logs)\n",
+                       palette = "RdYlGn",
+                       direction = 1,
+                       limits = c(25, 55),
+                       breaks = seq(25, 55, 5)) +
+  coord_cartesian(xlim = c(-.1, .2), ylim = c(-.1, .3)) +
+  labs(x = "Health outcome (short-term)\n(weight loss across 8 weeks)",
+       y = "Health outcome (long-term)\n(weight loss across 24 weeks)") +
+  guides(fill = guide_colorbar(barwidth = 1, barheight = 7)) +
+  theme_bw() +
+  theme(axis.title = element_text(size = 10, lineheight = 1.15),
+        axis.text = element_text(size = 8),
+        legend.title = element_text(size = 10, lineheight = 1.15),
+        legend.position = "right")
+
+p_corr_weight <- plot_grid(
+  p_corr_weight + theme(legend.position = "none"),
+  get_legend(p_corr_weight),
+  nrow = 1, rel_widths = c(3.5, 2)
+)
+
+ggsave("./figures/figure_2c.png", p_corr_weight, width = 5.5, height = 3, dpi = 300)
+```
+
+```{r, fig.width=7, fig.height=6}
+p_corr <- plot_grid(
+  p_corr_eng_ho,
+  plot_grid(
+    p_corr_weight, ggplot() + theme_nothing(),
+    nrow = 1, rel_widths = c(5.5, 1.5), labels = c("C", "")),
+  ncol = 1, align = "hv")
+
+p_corr
+ggsave("./figures/figure_2.png", p_corr, width = 7, height = 6, dpi = 300)
+```
+
+# Run analysis
+
+```{r run_models}
+alpha_min_rmse <- rep(0, 4)
+
+y_label <- 'NumLogged'
+text_label <- "Number of logs"
+fn_simul <- 'simul/res1.rda'
+if (file.exists(fn_simul)) {
+  load(fn_simul)
+} else {
+  res1 <- find_best_fit(N_ITER_PER_ALPHA, 64)
+  save(res1, file = fn_simul)
+}
+alpha_min_rmse[1]    <- get_alpha_min_rmse(res1)
+
+y_label <- 'WeightChange1'
+text_label <- "Weight change (week 0 - week 8)"
+fn_simul <- 'simul/res2.rda'
+if (file.exists(fn_simul)) {
+  load(fn_simul)
+} else {
+  res2 <- find_best_fit(N_ITER_PER_ALPHA, 64)
+  save(res2, file = fn_simul)
+}
+alpha_min_rmse[2]    <- get_alpha_min_rmse(res2)
+
+y_label <- 'WeightChange3'
+text_label <- "Weight change (week 0 - follow up)"
+fn_simul <- 'simul/res4.rda'
+if (file.exists(fn_simul)) {
+  load(fn_simul)
+} else {
+  res4 <- find_best_fit(N_ITER_PER_ALPHA, 64)
+  save(res4, file = fn_simul)
+}
+alpha_min_rmse[4]    <- get_alpha_min_rmse(res4)
+```
+
+```{r}
+dfs_coef <- list()
+
+for (i in c(1, 2, 4)) {
+  idx <- ifelse(i <= 2, i, i - 1)
+  
+  dfs_coef[[idx]] <-
+    eval(as.symbol(str_glue('res{i}'))) %>%
+    filter(alpha == alpha_min_rmse[i]) %>%
+    (function (df) {
+      df[1:1000,]
+    })() %>%
+    select(-alpha, -starts_with('r2_'), -starts_with('rmse_')) %>%
+    summarize_all(list(
+      "_avg" = mean,
+      "_sd" = sd,
+      "_ymax" = function(col) { quantile(col, .025) },
+      "_ymin" = function(col) { quantile(col, .975) })) %>%
+    gather(key, value, everything()) %>%
+    separate(key, c("predictor", "stat"), "__") %>%
+    spread(stat, value) %>%
+    mutate(category = map(predictor, ~ map_col_to_cat2[[.x]]) %>% flatten_chr(),
+           category = factor(category, levels = categories),
+           category_sub = map(predictor, ~ map_col_to_cat[[.x]]) %>% flatten_chr(),
+           category_sub = factor(category_sub, levels = categories_sub),
+           category_sub2 = map(predictor, ~ map_col_to_cat3[[.x]]) %>% flatten_chr(),
+           category_sub2 = factor(category_sub2, levels = categories_sub2),
+           predictor_base = factor(
+             predictor,
+             levels = predictors,
+             labels = map(predictors, ~ map_pred[[.x]]) %>% flatten_chr()),
+           predictor = fct_reorder(predictor_base, avg, .desc = TRUE),
+           ymax = avg + 2.58 * sd,
+           ymin = avg - 2.58 * sd,
+           avg = round(avg, 3),
+           ymax = round(ymax, 3),
+           ymin = round(ymin, 3),
+           color = ifelse((ymin * ymax <= 0) | (round(avg, 3) == 0.), "notsig",
+                          ifelse(ymax < 0, "neg", "pos")),
+           color = as.factor(color))
+}
+```
+
+# Figure 3
+
+```{r, fig.width=5, fig.height=7}
+df_coef <-
+  rbind(
+    dfs_coef[[1]] %>% mutate(dv = 1),
+    dfs_coef[[2]] %>% mutate(dv = 2),
+    dfs_coef[[3]] %>% mutate(dv = 3)
+  ) %>%
+  mutate(
+    dv = factor(dv, levels = 1:3, labels = c(
+      "Engagement",
+      "Health outcome (short-term)",
+      "Health outcome (long-term)"
+    )),
+    sig = color != "notsig"
+  ) %>%
+  select(-predictor, -color) %>%
+  rename(predictor = predictor_base) %>%
+  mutate(predictor = fct_rev(predictor)) %>%
+  select(dv, category, category_sub, predictor, everything())
+
+p_coef_in_one <- df_coef %>%
+  ggplot(aes(x = predictor, y = avg, group = dv)) +
+  geom_hline(yintercept = 0, alpha = 0.3) +
+  geom_line(aes(color = dv)) +
+  geom_errorbar(aes(ymax = ymax, ymin = ymin),
+                data = subset(df_coef, sig == TRUE),
+                color = '#666666', width = 0.2) +
+  geom_point(aes(fill = dv, shape = dv),
+             data = subset(df_coef, sig == TRUE),
+             stat = 'identity', size = 2.5) +
+  labs(x = 'Predictors',
+       y = 'Beta coefficient') +
+  scale_x_discrete() +
+  scale_y_continuous(breaks = round(seq(-.3, .15, .05), 3)) +
+  scale_color_discrete(name = "") +
+  scale_fill_discrete(name = "") +
+  scale_shape_manual(name = "", values = c(21, 22, 23)) +
+  facet_grid(interaction(category_sub2, category) ~ ., switch = "y", scales = "free_y", space = "free_y") +
+  coord_flip(ylim = c(-0.3, 0.15)) +
+  theme_bw() +
+  theme(legend.position = 'bottom',
+        legend.background = element_blank(),
+        legend.text = element_text(size = 8),
+        plot.background = element_rect(fill = "transparent", colour = NA),
+        panel.spacing = unit(6, "pt"),
+        strip.text.y = element_blank(),
+        strip.background = element_blank(),
+        axis.title.y = element_blank(),
+        axis.title.x = element_text(size = 10),
+        axis.text.x = element_text(size = 8),
+        axis.text.y = element_text(size = 9, color = 'black'),
+        plot.title = element_text(hjust = 0.5, face = 'bold'),
+        plot.subtitle = element_text(hjust = 0.5))
+
+p_coef_in_one <- plot_grid(
+  p_coef_in_one + theme(legend.position = 'none'),
+  get_legend(p_coef_in_one),
+  ncol = 1, rel_heights = c(20, 1)
+)
+
+p_coef_in_one
+ggsave('./figures/figure_3.png', p_coef_in_one, width = 5, height = 7, dpi = 300)
+```
+
+# Figure 4
+
+```{r, fig.width=7, fig.height=6}
+df_plot_coef <- 
+  df_coef %>%
+  mutate(avg = ifelse(sig == TRUE, avg, 0)) %>%
+  mutate(colname = sprintf("V%d", as.integer(dv))) %>%
+  select(-dv, -sd, -ymax, -ymin, -sig) %>%
+  spread(colname, avg)
+
+color_category2 <- list()
+color_category2[levels(df_plot_coef$category_sub2)] <- c(
+  "#F8766D", "#7CAE00", "#00BFC4", "#C77CFF"
+)
+
+plots_comp_coef <- list()
+
+plots_comp_coef[[1]] <- df_plot_coef %>%
+  filter((V1 != 0) & (V2 != 0)) %>%
+  ggplot(aes(x = V1, y = V2, fill = category_sub2)) +
+  annotate("rect", xmin = Inf, xmax = 0, ymin = -Inf, ymax = 0, fill = "gray50", alpha = 0.3) + 
+  annotate("rect", xmin = -Inf, xmax = 0, ymin = Inf, ymax = 0 , fill = "gray50", alpha = 0.3) + 
+  geom_point(aes(shape = category), size = 3, color = 'black') +
+  geom_text_repel(aes(label = predictor), box.padding = 0.5, size = 3, force = 100,
+                  point.padding = 0.4, segment.alpha = .25, show.legend = FALSE) +
+  scale_shape_manual(name = "Phenotype", values = c(23, 22)) +
+  scale_fill_manual(name = "Dimension", values = color_category2) +
+  guides(shape = guide_legend(order = 1, override.aes = list(fill = 'black')),
+         fill = guide_legend(order = 2, override.aes = list(shape = 21))) +
+  labs(x = paste(
+         "Beta coefficient",
+         "Engagement",
+         sep = "\n"
+       ),
+       y = paste(
+         "Beta coefficient",
+         "Health outcome (short-term)",
+         sep = "\n"
+       )) +
+  coord_cartesian(xlim = c(-.15, .15), ylim = c(-.15, .15)) +
+  theme_bw() +
+  theme(text = element_text(colour = 'black'),
+        axis.title = element_text(size = 10, lineheight = 1.15),
+        axis.text = element_text(size = 8),
+        legend.text = element_text(size = 10),
+        legend.position = 'right')
+
+plots_comp_coef[[2]] <- df_plot_coef %>%
+  filter((V1 != 0) & (V3 != 0)) %>%
+  ggplot(aes(x = V1, y = V3, fill = category_sub2)) +
+  annotate("rect", xmin = Inf, xmax = 0, ymin = -Inf, ymax = 0, fill = "gray50", alpha = 0.3) + 
+  annotate("rect", xmin = -Inf, xmax = 0, ymin = Inf, ymax = 0 , fill = "gray50", alpha = 0.3) + 
+  geom_point(aes(shape = category), size = 3, color = 'black') +
+  geom_text_repel(aes(label = predictor), box.padding = 2, size = 3,
+                  point.padding = 0.4, segment.alpha = .25, show.legend = FALSE) +
+  scale_fill_manual(name = "", values = color_category2) +
+  scale_shape_manual(name = "", values = c(23, 22)) +
+  labs(x = paste(
+         "Beta coefficient",
+         "Engagement",
+         sep = "\n"
+       ),
+       y = paste(
+         "Beta coefficient",
+         "Health outcome (long-term)",
+         sep = "\n"
+       )) +
+  coord_cartesian(xlim = c(-.1, .1), 
+                  ylim = c(-.25, .25)) +
+  theme_bw() +
+  theme(text = element_text(colour = 'black'),
+        axis.title = element_text(size = 10, lineheight = 1.15),
+        axis.text = element_text(size = 8),
+        legend.text = element_text(size = 10),
+        legend.position = 'bottom')
+
+plots_comp_coef[[3]] <- df_plot_coef %>%
+  filter((V2 != 0) & (V3 != 0)) %>%
+  ggplot(aes(x = V2, y = V3, fill = category_sub2)) +
+  annotate("rect", xmin = Inf, xmax = 0, ymin = -Inf, ymax = 0, fill = "gray50", alpha = 0.3) + 
+  annotate("rect", xmin = -Inf, xmax = 0, ymin = Inf, ymax = 0 , fill = "gray50", alpha = 0.3) + 
+  geom_point(aes(shape = category), size = 3, color = 'black') +
+  geom_text_repel(aes(label = predictor), box.padding = 2, size = 3,
+                  point.padding = 0.4, segment.alpha = .25, show.legend = FALSE) +
+  scale_fill_manual(name = "", values = color_category2) +
+  scale_shape_manual(name = "", values = c(23, 22)) +
+  labs(x = paste(
+         "Beta coefficient",
+         "Health outcome (short-term)",
+         sep = "\n"
+       ),
+       y = paste(
+         "Beta coefficient",
+         "Health outcome (long-term)",
+         sep = "\n"
+       )) +
+  coord_cartesian(xlim = c(-.125, .125),
+                  ylim = c(-.25, .25)) +
+  theme_bw() +
+  theme(text = element_text(colour = 'black'),
+        axis.title = element_text(size = 10, lineheight = 1.15),
+        axis.text = element_text(size = 8),
+        legend.text = element_text(size = 10),
+        legend.position = 'bottom')
+
+plots_comp_coef_nolegend <-
+  lapply(plots_comp_coef, function(p) { p + theme(legend.position = "none") })
+
+p_comp_coef <- plot_grid(
+  plots_comp_coef_nolegend[[1]],
+  get_legend(plots_comp_coef[[1]]),
+  plots_comp_coef_nolegend[[2]],
+  plots_comp_coef_nolegend[[3]],
+  ncol = 2, align = "hv", labels = c("A", "", "B", "C")
+)
+
+p_comp_coef
+ggsave("./figures/figure_4.png", p_comp_coef, width = 7, height = 6, dpi = 300)
+```
+
+# Figure 5
+
+```{r, fig.width=6, fig.height=6}
+plots <- list()
+for (p in c("Carb", "Confidence")) {
+  breaks <- list(Carb = c(75, 100, 125, 150, 175, 200),
+                 Confidence = c(0, 2, 4, 6, 8, 10))[[p]]
+  limits <- list(Carb = c(NA, NA), Confidence = c(0, 10))[[p]]
+  legend_title <- list(Carb = "Carb intake\n(kcal)\n",
+                       Confidence = "Confidence\n(VAS 0 - 10)\n")[[p]]
+  
+  plots[[p]] <- dat_glm_raw %>%
+    ggplot(aes(x = WeightChange1, y = WeightChange3)) +
+    geom_abline(slope = 1, intercept = 0, linetype = 'dashed', alpha = 0.3) +
+    geom_vline(xintercept = 0, alpha = 0.3) +
+    geom_hline(yintercept = 0, alpha = 0.3) +
+    geom_point(aes_string(fill = 'NumLogged', size = p), shape = 21) +
+    scale_x_continuous(labels = scales::percent) +
+    scale_y_continuous(labels = scales::percent) +
+    scale_fill_distiller(name = "Engagement\n(number of activity logs)\n",
+                         palette = "RdYlGn",
+                         direction = -1,
+                         limits = c(25, 55),
+                         breaks = seq(25, 55, 5)) +
+    scale_size_continuous(name = legend_title,
+                          breaks = breaks, limits = limits,
+                          range = c(0, 6)) +
+    coord_cartesian(xlim = c(-.1, .2), ylim = c(-.1, .3)) +
+    labs(x = "Health outcome (short-term)\n(Weight loss across 8 weeks)",
+         y = "Health outcome (long-term)\n(Weight loss across 24 weeks)") +
+    guides(fill = guide_colorbar(order = 2, barwidth = 1, barheight = 7),
+           size = guide_legend(order = 1, override.aes = list(color = 'black'))) +
+    theme_bw() +
+    theme(axis.title = element_text(size = 10, lineheight = 1.15),
+          axis.text = element_text(size = 8),
+          legend.title = element_text(size = 8, lineheight = 1.15),
+          legend.direction = "vertical",
+          legend.box = "horizontal",
+          legend.justification = c(.5, .8),
+          legend.position = "right")
+  
+  plots[[p]] <- plot_grid(
+    plots[[p]] + theme(legend.position = "none"),
+    get_legend(plots[[p]]),
+    nrow = 1, rel_widths = c(3.5, 2.5)
+  )
+}
+
+p_comm_pred <- plot_grid(plotlist = plots, ncol = 1, labels = "AUTO")
+p_comm_pred
+ggsave("./figures/figure_5.png", p_comm_pred, width = 6, height = 6, dpi = 300)
+```
+
+# Figure S1
+
+```{r, fig.width = 5, fig.height = 8}
+titles <- c("Engagement",
+            "Health outcome (short-term)",
+            "Weight change",
+            "Health outcome (long-term)")
+subtitles <- c("Number of activity logs",
+               "Weight change (8 weeks)",
+               "",
+               "Weight change (24 weeks)")
+
+plots_rmse <- list()
+for (i in c(1, 2, 4)) {
+  idx <- ifelse(i <= 2, i, i - 1)
+  plots_tmp <- list()
+  
+  c <- 'rmse_total'
+  
+  df_com <-
+    eval(as.symbol(str_glue('res{i}'))) %>%
+    select(alpha, starts_with('rmse_')) %>%
+    group_by(alpha) %>%
+    summarize(avg = mean(!!as.name(c)),
+              sd = sd(!!as.name(c)),
+              ymax = quantile(!!as.name(c), .025),
+              ymin = quantile(!!as.name(c), .975)) %>%
+    ungroup()
+
+  plots_rmse[[idx]] <-
+    df_com %>%
+    ggplot(aes(x = alpha, y = avg)) +
+    geom_line() +
+    geom_vline(aes(xintercept = alpha[which.min(avg)]), color = "red") +
+    geom_errorbar(aes(ymax = ymax, ymin = ymin), width = 0, alpha = 0.5) +
+    geom_point() +
+    geom_point(aes(x = alpha[which.min(avg)],
+                   y = avg[which.min(avg)]),
+               color = "red", size = 4, shape = 1) +
+    scale_y_continuous(expand = c(0.01, 0.01)) +
+    labs(x = TeX('$\\alpha$'),
+         y = 'RMSE',
+         title = titles[i],
+         subtitle = subtitles[i],
+         caption = TeX(str_c("* $\\alpha_{min} = ", df_com$alpha[which.min(df_com$avg)], "$"))) +
+    theme_bw() +
+    theme(legend.position = 'none',
+          plot.title = element_text(size = 12, face = 'bold', hjust = 0.5),
+          plot.subtitle = element_text(hjust = 0.5))
+}
+
+p_rmse <- plot_grid(plotlist = plots_rmse, ncol = 1, labels = "AUTO", align = "hv")
+p_rmse
+
+ggsave("./figures/figure_s1.png", p_rmse, width = 5, height = 8)
+```
+
+# Table S1
+
+```{r}
+df_table_s1 <- dat_glm_raw %>%
+  select(-NumLogged, -starts_with('WeightChange')) %>%
+  summarize_all(list("_mean" = mean, "_sd" = sd)) %>%
+  gather(colname, value, everything()) %>%
+  separate(colname, c("variable", "metric"), sep = "__") %>%
+  spread(metric, value) %>%
+  mutate(category = map(variable, ~ map_col_to_cat2[[.x]]) %>% flatten_chr(),
+         category = factor(category, levels = categories),
+         category_sub = map(variable, ~ map_col_to_cat3[[.x]]) %>% flatten_chr(),
+         category_sub = factor(category_sub, levels = categories_sub2),
+         variable_name = factor(
+           variable,
+           levels = predictors,
+           labels = map(predictors, ~ map_pred[[.x]]) %>% flatten_chr()
+         )) %>%
+  arrange(category, category_sub, variable_name) %>%
+  mutate(variable = str_replace(variable, 'Pre_', ''),
+         variable_name = ifelse(category == "Digital Phenotypes",
+                                as.character(variable_name),
+                                str_glue("{variable_name} ({variable})"))) %>%
+  select(-variable) %>%
+  relocate(category, category_sub, variable_name)
+
+df_table_s1 %>%
+  kable('latex', digits = 3, booktabs = TRUE)
+
+df_table_s1 %>%
+  write_csv('./data/table_s1.csv')
+```

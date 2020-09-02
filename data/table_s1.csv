@@ -1,0 +1,38 @@
+category,category_sub,variable_name,mean,sd
+Conventional Phenotypes,Behavioral,Restricted Eating (DEBQ_RE),29.81081081081081,6.903452589658139
+Conventional Phenotypes,Behavioral,Emotional Eating (DEBQ_EM),37.54054054054054,9.85053465721699
+Conventional Phenotypes,Behavioral,Environmental Eating (DEBQ_ENV),34.75675675675676,4.8212804051148845
+Conventional Phenotypes,Behavioral,Food Addiction (YFAS_total),2.5405405405405403,1.3037253160461753
+Conventional Phenotypes,Cognitive,Automatic Thoughts (ATQ30),56.91891891891892,21.81153922223838
+Conventional Phenotypes,Emotional,Depression (KBDI),13.216216216216216,8.03511437772127
+Conventional Phenotypes,Emotional,Anxiety (TAI),47.91891891891892,10.02601720629987
+Conventional Phenotypes,Emotional,Body Satisfaction (BSQ8C),35.83783783783784,7.297311200075734
+Conventional Phenotypes,Emotional,Self-esteem (RSES),19.64864864864865,5.148981648055469
+Conventional Phenotypes,Motivational,Conventional Motivation (SIMS),75.97297297297297,5.885417414095464
+Digital Phenotypes,Behavioral,Carb,142.94741517113667,26.48954555789747
+Digital Phenotypes,Behavioral,Protein,49.69391453514119,10.596154921835048
+Digital Phenotypes,Behavioral,Fat,38.46150864955553,9.365147991625644
+Digital Phenotypes,Behavioral,Sodium,2190.524437448336,585.9467088628854
+Digital Phenotypes,Behavioral,Sugar,39.4696320193831,11.424217604355663
+Digital Phenotypes,Behavioral,Breakfast,201.02744293472958,108.33083265664553
+Digital Phenotypes,Behavioral,Morning Snack,18.281584713111577,15.977169353460452
+Digital Phenotypes,Behavioral,Lunch,402.16096028452546,98.56035878989407
+Digital Phenotypes,Behavioral,Afternoon Snack,56.70576572997283,39.971590960410985
+Digital Phenotypes,Behavioral,Dinner,438.97833368207046,120.26013384790866
+Digital Phenotypes,Behavioral,Evening Snack,67.97550574391097,56.60989983303853
+Digital Phenotypes,Behavioral,High Calorie Food,0.2948665560721096,0.08689692749354547
+Digital Phenotypes,Behavioral,Moderate Calorie Food,0.47891778771823745,0.06309748164267236
+Digital Phenotypes,Behavioral,Low Calorie Food,0.17931884598249684,0.0879171050464579
+Digital Phenotypes,Behavioral,Steps,6485.001298086076,2618.5446754839213
+Digital Phenotypes,Behavioral,Exercise,8.166797959018808,8.140139082618603
+Digital Phenotypes,Behavioral,Interaction Frequency,9.479082592658349,2.343958815601802
+Digital Phenotypes,Cognitive,Obesity Automatic Thoughts,0.4946542466703183,0.6400056721665306
+Digital Phenotypes,Emotional,Irritated,46.53254494303988,23.390277490561324
+Digital Phenotypes,Emotional,Lonely,49.43270350725274,24.518837026482238
+Digital Phenotypes,Emotional,Nervous,47.25894704114865,23.810364723192553
+Digital Phenotypes,Emotional,Bored,47.73795430857665,24.176939600002587
+Digital Phenotypes,Emotional,Depressed,47.03981552793181,24.27402249353434
+Digital Phenotypes,Motivational,Will,4.581802521197212,2.2271798291696165
+Digital Phenotypes,Motivational,Importance,3.725512298760959,2.1010159367451235
+Digital Phenotypes,Motivational,Confidence,4.1145943946792825,2.195522374752952
+Digital Phenotypes,Motivational,Satisfaction,4.458113407965064,2.399007537800903
