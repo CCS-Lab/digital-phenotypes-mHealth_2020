@@ -202,12 +202,12 @@ for (i in 1:length(cols_weight_change)) {
   
   label_cor <- str_c(
     sprintf("Pearson's r = %.2f\n", fit_cor$estimate[['cor']]),
-    ifelse(round(fit_cor$p.value, 3) >= 0.001,
-      sprintf("(t = %.2f, df = %d, p = %.3f)",
+    ifelse(round(fit_cor$p.value, 3) >= 0.0001,
+      sprintf("(t = %.2f, df = %d, p = %.5f)",
               fit_cor$statistic[['t']],
               fit_cor$parameter[['df']],
               fit_cor$p.value),
-      sprintf("(t = %.2f, df = %d, p < 0.001)",
+      sprintf("(t = %.2f, df = %d, p < 0.0001)",
               fit_cor$statistic[['t']],
               fit_cor$parameter[['df']])
     )
@@ -242,12 +242,12 @@ fit_cor <- cor.test(dat_glm_raw$WeightChange1, dat_glm_raw$WeightChange3)
 
 label_cor <- str_c(
   sprintf("Pearson's r = %.2f\n", fit_cor$estimate[['cor']]),
-  ifelse(round(fit_cor$p.value, 3) >= 0.001,
+  ifelse(round(fit_cor$p.value, 3) >= 0.0001,
     sprintf("(t = %.2f, df = %d, p = %.3f)",
             fit_cor$statistic[['t']],
             fit_cor$parameter[['df']],
             fit_cor$p.value),
-    sprintf("(t = %.2f, df = %d, p < 0.001)",
+    sprintf("(t = %.2f, df = %d, p < 0.0001)",
             fit_cor$statistic[['t']],
             fit_cor$parameter[['df']])
   )
@@ -296,6 +296,7 @@ p_corr <- plot_grid(
 
 p_corr
 ggsave("./figures/figure_2.png", p_corr, width = 7, height = 6, dpi = 300)
+ggsave("./figures/figure_2.svg", p_corr, width = 7, height = 6, dpi = 300)
 ```
 
 # Run analysis
@@ -444,6 +445,7 @@ p_coef_in_one <- plot_grid(
 
 p_coef_in_one
 ggsave('./figures/figure_3.png', p_coef_in_one, width = 5, height = 7, dpi = 300)
+ggsave('./figures/figure_3.svg', p_coef_in_one, width = 5, height = 7, dpi = 300)
 ```
 
 # Figure 4
@@ -564,6 +566,7 @@ p_comp_coef <- plot_grid(
 
 p_comp_coef
 ggsave("./figures/figure_4.png", p_comp_coef, width = 7, height = 6, dpi = 300)
+ggsave("./figures/figure_4.svg", p_comp_coef, width = 7, height = 6, dpi = 300)
 ```
 
 # Figure 5
@@ -617,6 +620,7 @@ for (p in c("Carb", "Confidence")) {
 p_comm_pred <- plot_grid(plotlist = plots, ncol = 1, labels = "AUTO")
 p_comm_pred
 ggsave("./figures/figure_5.png", p_comm_pred, width = 6, height = 6, dpi = 300)
+ggsave("./figures/figure_5.svg", p_comm_pred, width = 6, height = 6, dpi = 300)
 ```
 
 # Figure S1
@@ -674,6 +678,7 @@ p_rmse <- plot_grid(plotlist = plots_rmse, ncol = 1, labels = "AUTO", align = "h
 p_rmse
 
 ggsave("./figures/figure_s1.png", p_rmse, width = 5, height = 8)
+ggsave("./figures/figure_s1.svg", p_rmse, width = 5, height = 8)
 ```
 
 # Table S1
